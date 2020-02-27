@@ -55,6 +55,7 @@ def MonitorearAgente(ip, comunidad, idAgente):
             ipInReceives = str(paquetesIPV4) if str(paquetesIPV4).isdigit() else ipInReceives
 
             #print( "3. Mensajes ICMP echo que ha enviado el agente 1.3.6.1.2.1.5.21.0" )
+	    echoICMP =  consultaSNMP( comunidad, ip, '1.3.6.1.2.1.6.10.0' )
             echoICMP = consultaSNMP( comunidad, ip, '1.3.6.1.2.1.5.21.0' )
             icmpOutEchos = str(echoICMP) if str(echoICMP).isdigit() else icmpOutEchos
             
