@@ -1,0 +1,3 @@
+127.0.0.1, v1, comunidadSNMP, 161, 0
+10.100.75.105, v1, AldoMendoza4cv5, 161, 2
+10.100.71.231, v11, AldoMendoza4cv5, 161, 3

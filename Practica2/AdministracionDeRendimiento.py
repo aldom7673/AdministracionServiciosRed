@@ -131,7 +131,7 @@ def ResumenGeneral():
 def AgregarAgente():
     os.system("clear")
     #Formato del archivo:
-    # IP agente | Version SNMP | Comunidad | Puerto | ID del agente
+    # IP agente | Version SNMP | Comunidad | Puerto
     print( "Ingresa los siguientes datos para agregar un nuevo agente" )    
     ip = input( "Ingresa la direccion IP del agente: " )
     versionSNMP = input( "Ingresa la version SNMP: " )
@@ -190,7 +190,7 @@ def GenerarReporte():
     
     tiempo_actual = int(time.time())
     tiempo_inicio = tiempo_actual - tiempo_fin
-    idAgente = ObtenerInformacionAgenteArchivo( int(numeroAgente), ID, True)
+    idAgente = ObtenerIdAgente( int(numeroAgente) )
     Graficar(idAgente, tiempo_inicio, "udpInDatagrams", "Cantidad de datagramas", "Datagramas entregados a usuarios UDP", "Datagramas entregados")
     Graficar(idAgente, tiempo_inicio, "ipInReceives", "Cantidad de paquetes", "Paquetes recibidos a protocolos IPv4 con errores", "Paquetes recibidos")
     Graficar(idAgente, tiempo_inicio, "icmpOutEchos", "Cantidad de mensajes", "Mensajes ICMP echo que ha enviado el agente", "Mensajes enviados")
@@ -198,14 +198,28 @@ def GenerarReporte():
     Graficar(idAgente, tiempo_inicio, "ifInUcastPkts", "Cantidad de datagramas", "Datagramas entregados a usuarios UDP", "Datagramas entregados")
     GenerarPDF( idAgente, numeroAgente)
 
-def ObtenerInformacionAgenteArchivo( numeroAgente, informacion, es_ultimo = False):
+def ObtenerIdAgente( numeroAgente ):
     archivoAgentes = open ( "AgentesRegistrados.txt", "r" )
     for agente in archivoAgentes:
         if( agente.split( ", " )[IP] == agentes[ numeroAgente ] ):
             archivoAgentes.close()
-            if( es_ultimo ):
-                return agente.split(", ")[informacion].split( "\n" )[0]
-            return agente.split(", ")[informacion]
+            return agente.split(", ")[ID].split( "\n" )[0]
+    archivoAgentes.close()
+
+def ObtenerComunidadAgente( numeroAgente ):
+    archivoAgentes = open ( "AgentesRegistrados.txt", "r" )
+    for agente in archivoAgentes:
+        if( agente.split( ", " )[IP] == agentes[ numeroAgente ] ):
+            archivoAgentes.close()
+            return agente.split(", ")[COMUNIDAD]
+    archivoAgentes.close()
+
+def ObtenerVersionSNMPAgente( numeroAgente ):
+    archivoAgentes = open ( "AgentesRegistrados.txt", "r" )
+    for agente in archivoAgentes:
+        if( agente.split( ", " )[IP] == agentes[ numeroAgente ] ):
+            archivoAgentes.close()
+            return agente.split(", ")[VERSION_SNMP]
     archivoAgentes.close()
 
 def Graficar(idAgente, tiempo_inicio, dato_a_graficar, label_grafica, titulo_grafica, info_label):
@@ -218,8 +232,8 @@ def Graficar(idAgente, tiempo_inicio, dato_a_graficar, label_grafica, titulo_gra
 
 def GenerarPDF( idAgente, numAgente):
     numeroAgente = int(numAgente)
-    comunidadAgente = ObtenerInformacionAgenteArchivo(numeroAgente, COMUNIDAD)
-    versionSNMPAgente = ObtenerInformacionAgenteArchivo(numeroAgente, VERSION_SNMP)
+    comunidadAgente = ObtenerComunidadAgente(numeroAgente)
+    versionSNMPAgente = ObtenerVersionSNMPAgente(numeroAgente)
 
     nombreArchivo = agentes[ numeroAgente ].replace(".","")
     documento = canvas.Canvas("Reportes/reporteAgente" + nombreArchivo + ".pdf")
