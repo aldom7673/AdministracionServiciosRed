@@ -1,31 +1,25 @@
-import time
 from pysnmp.hlapi import *
+from getSNMP import consultaSNMP
+from getSNMP import consultaSNMPWalk
 
-def consultaSNMP(comunidad,host,puerto,oid):
-    errorIndication, errorStatus, errorIndex, varBinds = next(
-        getCmd(SnmpEngine(),
-               CommunityData(comunidad),
-               UdpTransportTarget((host, int(puerto))),
-               ContextData(),
-               ObjectType(ObjectIdentity(oid))))
-
-    if errorIndication:
-        resultado = errorIndication 
-    elif errorStatus:
-        print('%s at %s' % (errorStatus.prettyPrint(),errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
-    else:
-        for varBind in varBinds:
-            varB=(' = '.join([x.prettyPrint() for x in varBind]))
-            resultado= varB.split()[2]
-    return resultado
-
-host = "192.168.100.10"
+host = "10.100.79.110"
 version = "1"
-comunidad = "comunidadSNMP"
+comunidad = "AldoMendoza4cv5"
 puerto = 161
 
-while(True):
-    consultaSNMP(comunidad,host,puerto,'1.3.6.1.2.1.2.2.1.11.1')
-    time.sleep(1)
+# hrProcessorLoad	 = "1.3.6.1.2.1.25.3.3.1.2"
+# Ejecutar res = consultaSNMPWalk() y ejecutar hrProcessorLoad + res[i] 
+# para obtener la carga de cada procesador
 
-#guardardispositivo(nombre,host,version,comunidad,puerto)
+# hrStorageTable = "1.3.6.1.2.1.25.2.3.1"
+# entidad = "Physical Memory"
+# Ejecutar res = consultaSNMPWalk(hrStorageTable + ".3"), entidad) para obtener el numero de la entidad 
+# especificada y ejecutar hrStorageTable + ".4" + res para obtener el uso de la RAM
+
+# hrStorageTable = "1.3.6.1.2.1.25.2.3.1"
+entidad = "C:" # "/" 
+# Ejecutar res = consultaSNMPWalk(..., entidad) para obtener el numero la entidad especificada,
+# (si es un disco en Windows, especificarlo enviando al final una bandera en True) y ejecutar
+# hrStorageTable + ".5" + res para obtener el uso de disco 
+
+print( consultaSNMPWalk(comunidad,host,'1.3.6.1.2.1.25.2.3.1.3', entidad, True) )
