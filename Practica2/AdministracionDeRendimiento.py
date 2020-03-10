@@ -327,6 +327,8 @@ def ObtenerNumeroAgente( mensaje ):
     input( "Por favor, ingrese una opcion valida. Pulse enter para continuar ... " )
     return ObtenerNumeroAgente(mensaje )
 
+def DeteccionDeComportamientos():
+    print( "" )
 agentes = []
 ultimoID = InicializarVariables()
 
@@ -348,6 +350,8 @@ while(True):
     elif (opcion == "4"):
         GenerarReporte()
     elif (opcion == "5"):
+        DeteccionDeComportamientos()
+    elif (opcion == "6"):
         print( "Salir" )
         agentes.clear()
         break
