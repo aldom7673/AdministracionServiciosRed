@@ -7,6 +7,7 @@ from datetime import timedelta
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from getSNMP import consultaSNMP
+from getSNMP import consultaSNMPWalk
 from reportlab.lib.utils import ImageReader
 
 IP = 0
@@ -38,13 +39,36 @@ def InicializarVariables():
     archivoAgentes.close()
     return ultimoID
 
+def MonitorearRendimientoAgente(ip, comunidad, idAgente):
+    CPULoad = RAMLoad = StorageLoad = 0
+    while(ip in agentes):
+        estadoDelAgente = str(consultaSNMP( comunidad, ip, '1.3.6.1.2.1.1.1.0'))
+        if( estadoDelAgente.split( )[0] != "No" ):
+            consultaSistemaOperativo = str(consultaSNMP(comunidad, ip, '1.3.6.1.2.1.1.1.0'))
+
+            entidad = "Physical Memory"
+            res = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad)
+            TotalRAM = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.5.' + res)
+            UsoRAM = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.6.' + res)
+            RAMLoad = int(UsoRAM) * 100 / int( TotalRAM )
+
+            if (consultaSistemaOperativo == 'Linux'):
+                entidad = "/"
+            else:
+                entidad = "C:"
+            res = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad)
+            TotalStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.5.' + res)
+            UseStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.6.' + res)
+            StorageLoad = int(UseStorage) * 100 / int(TotalStorage)            
+
 def MonitorearAgente(ip, comunidad, idAgente):
     crearRRDs(idAgente)
     #print("Monitoreando agente ", ip)
+    thread_read = threading.Thread(target = MonitorearRendimientoAgente, args=[ip, comunidad, idAgente])
+    thread_read.start()
     while(ip in agentes):
         ifInUcastPkts = ipInReceives = icmpOutEchos = tcpInSegs = udpInDatagrams = "0"
         estadoDelAgente = str(consultaSNMP( comunidad, ip, '1.3.6.1.2.1.1.1.0'))
-
         if( estadoDelAgente.split( )[0] != "No" ):
             #print( "1. Paquetes unicast que ha recibido 1.3.6.1.2.1.2.2.1.11.X" )
             paquetesUnicast = consultaSNMP( comunidad, ip, '1.3.6.1.2.1.2.2.1.11.1' )        
@@ -80,11 +104,17 @@ def crearRRDs( idAgente ):
 	                     "DS:icmpOutEchos:COUNTER:600:U:U",
 	                     "DS:tcpInSegs:COUNTER:600:U:U",
 	                     "DS:udpInDatagrams:COUNTER:600:U:U",
+                         "DS:CPULoad:GAUGE:600:U:U",
+                         "DS:RAMLoad:GAUGE:600:U:U",
+                         "DS:StorageLoad:GAUGE:600:U:U",
 	                     "RRA:AVERAGE:0.5:1:700",
 	                     "RRA:AVERAGE:0.5:1:700",
 	                     "RRA:AVERAGE:0.5:1:700",
 	                     "RRA:AVERAGE:0.5:1:700",
-	                     "RRA:AVERAGE:0.5:1:700")
+	                     "RRA:AVERAGE:0.5:1:700",
+                         "RRA:AVERAGE:0.5:1:700",
+                         "RRA:AVERAGE:0.5:1:700",
+                         "RRA:AVERAGE:0.5:1:700")
 	rrdtool.dump( 'RRDsAgentes/agente'+ idAgente +'.rrd', 'RRDsAgentes/agente'+ idAgente +'.xml' )
 
 	if ret:
@@ -107,6 +137,7 @@ def ResumenGeneral():
             estado = "UP"
             numeroDePuertos = str(consultaSNMP(datosAgente[COMUNIDAD],datosAgente[IP],'1.3.6.1.2.1.2.1.0'))
         print("\n\tAgente : " + datosAgente[IP] + ". Estado: " + estado + ". Numero de puertos: " + numeroDePuertos)
+
         if( numeroDePuertos.isdigit()):
             print("\t\tEstado de los puertos: ")
             for i  in range(1, int(numeroDePuertos) + 1):                

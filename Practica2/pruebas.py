@@ -29,7 +29,7 @@ while(True):
     print( "RAM :  " + consultaSNMP(comunidad, host,'1.3.6.1.2.1.25.2.3.1.6.' + res) )
     time.sleep(5)
 
-# hrStorageTable = "1.3.6.1.2.1.25.2.3.1"
+# hrStorageTable = "1.3.6.1.2.1.25.2.3.1.3"
 #entidad = "C:" # "/" 
 # Ejecutar res = consultaSNMPWalk(..., entidad) para obtener el numero la entidad especificada,
 # (si es un disco en Windows, especificarlo enviando al final una bandera en True) y ejecutar
