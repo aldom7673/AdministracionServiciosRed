@@ -7,10 +7,10 @@ COMMASPACE = ', '
 # Define params
 pngpath = 'Monitoreo/'
 
-mailsender = "pruebasaldomail@gmail.com"
-mailreceip = "aldom7673@gmail.com"
+mailsender = "aldom7673@gmail.com"
+mailreceip = "tanibet.escom@gmail.com"
 mailserver = 'smtp.gmail.com: 587'
-password = 'contrasena1'
+password = 'blink_1497'
 
 def send_alert_attached(subject, imagen):
     """ Will send e-mail, attaching png

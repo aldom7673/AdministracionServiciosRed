@@ -15,13 +15,13 @@ VERSION_SNMP = 1
 COMUNIDAD = 2
 PUERTO = 3
 ID = 4
-UMBRAL_READY_RAM = '50'
-UMBRAL_SET_RAM = '60'
-UMBRAL_GO_RAM = '70'
+UMBRAL_READY_RAM = '25'
+UMBRAL_SET_RAM = '40'
+UMBRAL_GO_RAM = '90'
 
-UMBRAL_READY_CPU = '30'
+UMBRAL_READY_CPU = '20'
 UMBRAL_SET_CPU = '40'
-UMBRAL_GO_CPU = '50'
+UMBRAL_GO_CPU = '60'
 
 UMBRAL_READY_STORAGE = '20'
 UMBRAL_SET_STORAGE = '40'
@@ -177,7 +177,7 @@ def crearRRDsMonitoreo(idAgente,DS,RRA):
 	    print ( rrdtool.error() )
 
 def ResumenGeneral():
-    os.system("clear")
+    #os.system("clear")
     print( "Resumen general de dispositivos" )
     print( "Se estan monitoreando " + str( len( agentes ) ) + " dispositivos.")
     
@@ -216,7 +216,7 @@ def ResumenGeneral():
     archivoAgentes.close()
 
 def AgregarAgente():
-    os.system("clear")
+    #os.system("clear")
     #Formato del archivo:
     # IP agente | Version SNMP | Comunidad | Puerto
     print( "Ingresa los siguientes datos para agregar un nuevo agente" )    
@@ -240,7 +240,7 @@ def AgregarAgente():
     return idAgente
 
 def EliminarAgente():    
-    os.system("clear")
+    #os.system("clear")
     numeroAgenteEliminar = int( ObtenerNumeroAgente( "Selecciona el agente que deseas eliminar" ) )
 
     if(numeroAgenteEliminar == -1):
@@ -393,7 +393,7 @@ def GenerarPDF( idAgente, numAgente):
     documento.save()
 
 def ObtenerNumeroAgente( mensaje ):
-    os.system( "clear" )
+    #os.system( "clear" )
     print( mensaje )
 
     for i in range( len(agentes) ):
@@ -422,12 +422,13 @@ def VerificarUmbrales(READY, SET, GO, valor, entidad, grafica):
         ultimo_valor = float(valor)
     except ValueError:
         ultimo_valor = 0.0
+    print(ultimo_valor)
     if( float(READY) <= ultimo_valor < float(SET)):
         print(entidad + " paso el umbral ready")
         if( not BANDERA_CORREO_READY ):
             BANDERA_CORREO_READY = not BANDERA_CORREO_READY
             print("Enviando correo")
-            send_alert_attached("Aldo Mendoza (" + entidad + "PASO EL UMBRAL READY)" , grafica)
+            send_alert_attached("Aldo Mendoza (" + entidad + " PASO EL UMBRAL READY)" , grafica)
 
     elif(float(SET) <= ultimo_valor < float(GO)):
         print(entidad + " paso el umbral set")
@@ -447,7 +448,7 @@ def VerificarUmbrales(READY, SET, GO, valor, entidad, grafica):
 
 def MonitorearComportamiento(idAgente = -1, comunidad = '', ip = '', OPCION_MENU = False):
     if( idAgente == -1):
-        os.system("clear")
+        #os.system("clear")
         numeroAgenteMonitorear = int( ObtenerNumeroAgente( "Selecciona el agente que deseas monitorear" ) )
 
         if(numeroAgenteMonitorear == -1):
@@ -457,13 +458,13 @@ def MonitorearComportamiento(idAgente = -1, comunidad = '', ip = '', OPCION_MENU
         idAgente = ObtenerIdAgente( int(numeroAgenteMonitorear) )
     while(True):
         print("Agente " + ip)
-        CPUs =  consultaSNMPWalk(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2')
-        for cpu in CPUs:
-            GraficarUmbrales(idAgente, ip, "CPU"+ cpu, UMBRAL_READY_CPU, UMBRAL_SET_CPU, UMBRAL_GO_CPU, "Carga CPU " + cpu)
+#        CPUs =  consultaSNMPWalk(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2')
+ #       for cpu in CPUs:
+#            GraficarUmbrales(idAgente, ip, "CPU"+ cpu, UMBRAL_READY_CPU, UMBRAL_SET_CPU, UMBRAL_GO_CPU, "Carga CPU " + cpu)
         #cpu = "196609"
-        GraficarUmbrales(idAgente, ip, "CPU"+ cpu, UMBRAL_READY_CPU, UMBRAL_SET_CPU, UMBRAL_GO_CPU, "Carga CPU " + cpu)
+        #GraficarUmbrales(idAgente, ip, "CPU"+ cpu, UMBRAL_READY_CPU, UMBRAL_SET_CPU, UMBRAL_GO_CPU, "Carga CPU " + cpu)
         GraficarUmbrales(idAgente, ip, "RAM", UMBRAL_READY_RAM, UMBRAL_SET_RAM, UMBRAL_GO_RAM, "Carga RAM ")
-        GraficarUmbrales(idAgente, ip, "Storage", UMBRAL_READY_STORAGE, UMBRAL_SET_STORAGE, UMBRAL_GO_STORAGE, "Almacenamiento ")
+        #GraficarUmbrales(idAgente, ip, "Storage", UMBRAL_READY_STORAGE, UMBRAL_SET_STORAGE, UMBRAL_GO_STORAGE, "Almacenamiento ")
         if(not OPCION_MENU):            
             break
         time.sleep(5)
@@ -502,7 +503,7 @@ def GraficarUmbrales(idAgente, ip, entidad, UMBRAL_READY, UMBRAL_SET, UMBRAL_GO,
 
 def ModificarUmbrales():
     while(True):
-        os.system( "clear" )
+        #os.system( "clear" )
         print( "Selecciona el umbral que quieres modificar" )
         print( "1. CPUs" )
         print( "2. RAM" )
@@ -553,7 +554,7 @@ agentes = []
 ultimoID = InicializarVariables()
 
 while(True):
-    os.system( "clear" )
+    #os.system( "clear" )
     print( "1. Resumen general" )
     print( "2. Agregar agente" )
     print( "3. Eliminar agente" )
