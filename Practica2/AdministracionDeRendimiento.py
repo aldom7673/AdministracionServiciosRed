@@ -90,8 +90,8 @@ def MonitorearRendimientoAgente(ip, comunidad, idAgente):
                 if (consultaSistemaOperativo == 'Linux'):
                     entidad = "/" #Almacenamiento
                 else:
-                    entidad = "C:" #Almacenamiento
-                numeroAlamacenamiento = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad)
+                    entidad = "c:" #Almacenamiento
+                numeroAlamacenamiento = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad, consultaSistemaOperativo != 'Linux')
             TotalStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.5.' + numeroAlamacenamiento)
             UsoStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.6.' + numeroAlamacenamiento)
             StorageLoad = str(int(UsoStorage) * 100 / int(TotalStorage))
@@ -111,7 +111,7 @@ def MonitorearRendimientoAgente(ip, comunidad, idAgente):
             rrdtool.dump('RRDsAgentes/monitoreo' + idAgente + '.rrd','RRDsAgentes/monitoreo' + idAgente + '.xml')
             #print(CPULoads)
             #MonitorearComportamiento(idAgente, comunidad, ip)
-            time.sleep(5)
+            time.sleep(3)
             
 def MonitorearAgente(ip, comunidad, idAgente):
     crearRRDs(idAgente)
@@ -168,7 +168,7 @@ def crearRRDs( idAgente ):
 def crearRRDsMonitoreo(idAgente,DS,RRA):
 	ret = rrdtool.create("RRDsAgentes/monitoreo"+ idAgente +".rrd",
 	                     "--start",'N',
-	                     "--step",'5',
+	                     "--step",'3',
                          DS,
                          RRA)
 	rrdtool.dump( 'RRDsAgentes/monitoreo'+ idAgente +'.rrd', 'RRDsAgentes/monitoreo'+ idAgente +'.xml' )
@@ -460,6 +460,8 @@ def MonitorearComportamiento(idAgente = -1, comunidad = '', ip = '', OPCION_MENU
         CPUs =  consultaSNMPWalk(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2')
         for cpu in CPUs:
             GraficarUmbrales(idAgente, ip, "CPU"+ cpu, UMBRAL_READY_CPU, UMBRAL_SET_CPU, UMBRAL_GO_CPU, "Carga CPU " + cpu)
+        #cpu = "196609"
+        GraficarUmbrales(idAgente, ip, "CPU"+ cpu, UMBRAL_READY_CPU, UMBRAL_SET_CPU, UMBRAL_GO_CPU, "Carga CPU " + cpu)
         GraficarUmbrales(idAgente, ip, "RAM", UMBRAL_READY_RAM, UMBRAL_SET_RAM, UMBRAL_GO_RAM, "Carga RAM ")
         GraficarUmbrales(idAgente, ip, "Storage", UMBRAL_READY_STORAGE, UMBRAL_SET_STORAGE, UMBRAL_GO_STORAGE, "Almacenamiento ")
         if(not OPCION_MENU):            
