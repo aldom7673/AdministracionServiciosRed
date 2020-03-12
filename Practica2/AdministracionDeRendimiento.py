@@ -3,6 +3,7 @@ import threading
 import time
 import rrdtool
 import datetime
+from Notify import send_alert_attached
 from datetime import timedelta
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -14,6 +15,21 @@ VERSION_SNMP = 1
 COMUNIDAD = 2
 PUERTO = 3
 ID = 4
+UMBRAL_READY_RAM = '50'
+UMBRAL_SET_RAM = '60'
+UMBRAL_GO_RAM = '70'
+
+UMBRAL_READY_CPU = '30'
+UMBRAL_SET_CPU = '40'
+UMBRAL_GO_CPU = '50'
+
+UMBRAL_READY_STORAGE = '20'
+UMBRAL_SET_STORAGE = '40'
+UMBRAL_GO_STORAGE = '70'
+
+BANDERA_CORREO_READY = False
+BANDERA_CORREO_SET = False
+BANDERA_CORREO_GO = False
 
 def InicializarVariables():
     #print( "Cargando datos de los agentes" )
@@ -40,13 +56,26 @@ def InicializarVariables():
 
 def MonitorearRendimientoAgente(ip, comunidad, idAgente):
     RAMLoad = StorageLoad = 0.0
-    numeroRam = numeroAlamacenamiento = ''
-    CPUs, CPULoads = []
-    
+    numeroRam = numeroAlamacenamiento = CPULoads = ''
+    CPUs= []
+    RRA = []
+    DS = []
+
     while(ip in agentes):
         estadoDelAgente = str(consultaSNMP( comunidad, ip, '1.3.6.1.2.1.1.1.0'))
 
         if( estadoDelAgente.split( )[0] != "No" ):
+            if(len(DS) == 0 and len(RRA) == 0):
+                CPUs =  consultaSNMPWalk(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2')
+                DS.append("DS:RAM:GAUGE:600:U:U")
+                RRA.append("RRA:AVERAGE:0.5:1:60")
+                DS.append("DS:Storage:GAUGE:600:U:U")
+                RRA.append("RRA:AVERAGE:0.5:1:60")
+                for cpu in CPUs:
+                    DS.append("DS:CPU" + cpu +":GAUGE:600:U:U")
+                    RRA.append("RRA:AVERAGE:0.5:1:60")
+                crearRRDsMonitoreo(idAgente,DS,RRA)
+
             if( numeroAlamacenamiento == '' ):
                 consultaSistemaOperativo = str(consultaSNMP(comunidad, ip, '1.3.6.1.2.1.1.1.0'))
 
@@ -55,7 +84,7 @@ def MonitorearRendimientoAgente(ip, comunidad, idAgente):
                 numeroRam = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad)
             TotalRAM = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.5.' + numeroRam)
             UsoRAM = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.6.' + numeroRam)
-            RAMLoad = int(UsoRAM) * 100 / int( TotalRAM )
+            RAMLoad = str(int(UsoRAM) * 100 / int( TotalRAM ))
 
             if( numeroAlamacenamiento == ''):
                 if (consultaSistemaOperativo == 'Linux'):
@@ -65,13 +94,25 @@ def MonitorearRendimientoAgente(ip, comunidad, idAgente):
                 numeroAlamacenamiento = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad)
             TotalStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.5.' + numeroAlamacenamiento)
             UsoStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.6.' + numeroAlamacenamiento)
-            StorageLoad = int(UsoStorage) * 100 / int(TotalStorage)
+            StorageLoad = str(int(UsoStorage) * 100 / int(TotalStorage))
             
-            if( len(CPUs) == 0 ):
+            if(len(CPUs) == 0):
                 CPUs =  consultaSNMPWalk(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2')
-            for cpu in CPUs:
-                CPULoads.append( consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2.' + cpu) )
 
+            CPULoads = ''
+            for cpu in CPUs:
+                if( cpu != CPUs[len(CPUs) - 1] ):
+                    CPULoads += consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2.' + cpu)+":"
+                else:
+                    CPULoads += consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2.' + cpu)
+            
+            valor =  "N:" + RAMLoad + ':' + StorageLoad + ':' + CPULoads            
+            rrdtool.update("RRDsAgentes/monitoreo" + idAgente + '.rrd', valor)
+            rrdtool.dump('RRDsAgentes/monitoreo' + idAgente + '.rrd','RRDsAgentes/monitoreo' + idAgente + '.xml')
+            #print(CPULoads)
+            #MonitorearComportamiento(idAgente, comunidad, ip)
+            time.sleep(5)
+            
 def MonitorearAgente(ip, comunidad, idAgente):
     crearRRDs(idAgente)
     #print("Monitoreando agente ", ip)
@@ -105,7 +146,6 @@ def MonitorearAgente(ip, comunidad, idAgente):
         rrdtool.dump('RRDsAgentes/agente' + idAgente + '.rrd','RRDsAgentes/agente' + idAgente + '.xml')
         time.sleep(1)
 
-
 def crearRRDs( idAgente ):
     ret = rrdtool.create("RRDsAgentes/agente"+ idAgente +".rrd",
 	                     "--start",'N',
@@ -125,16 +165,16 @@ def crearRRDs( idAgente ):
     if ret:
         print ( rrdtool.error() )
 
-# def crearRRDsMonitoreo(idAgente,DS,RRA):
-# 	ret = rrdtool.create("RRDsAgentes/monitoreo"+ idAgente +".rrd",
-# 	                     "--start",'N',
-# 	                     "--step",'1',
-#                          DS,
-#                          RRA)
-# 	rrdtool.dump( 'RRDsAgentes/monitoreo'+ idAgente +'.rrd', 'RRDsAgentes/monitoreo'+ idAgente +'.xml' )
+def crearRRDsMonitoreo(idAgente,DS,RRA):
+	ret = rrdtool.create("RRDsAgentes/monitoreo"+ idAgente +".rrd",
+	                     "--start",'N',
+	                     "--step",'5',
+                         DS,
+                         RRA)
+	rrdtool.dump( 'RRDsAgentes/monitoreo'+ idAgente +'.rrd', 'RRDsAgentes/monitoreo'+ idAgente +'.xml' )
 
-# 	if ret:
-# 	    print ( rrdtool.error() )
+	if ret:
+	    print ( rrdtool.error() )
 
 def ResumenGeneral():
     os.system("clear")
@@ -374,8 +414,90 @@ def ObtenerNumeroAgente( mensaje ):
     input( "Por favor, ingrese una opcion valida. Pulse enter para continuar ... " )
     return ObtenerNumeroAgente(mensaje )
 
-def MonitorearComportamiento():
-    print( "" )
+def VerificarUmbrales(READY, SET, GO, valor, entidad, grafica):
+    global BANDERA_CORREO_READY
+    global BANDERA_CORREO_SET
+    global BANDERA_CORREO_GO
+    try:
+        ultimo_valor = float(valor)
+    except ValueError:
+        ultimo_valor = 0.0
+    if( float(READY) <= ultimo_valor < float(SET)):
+        print(entidad + " paso el umbral ready")
+        if( not BANDERA_CORREO_READY ):
+            BANDERA_CORREO_READY = not BANDERA_CORREO_READY
+            print("Enviando correo")
+            send_alert_attached("Aldo Mendoza (" + entidad + "PASO EL UMBRAL READY)" , grafica)
+
+    elif(float(SET) <= ultimo_valor < float(GO)):
+        print(entidad + " paso el umbral set")
+        if( not BANDERA_CORREO_SET ):
+            BANDERA_CORREO_SET = not BANDERA_CORREO_SET
+            print("Enviando correo")
+            send_alert_attached("Aldo Mendoza (" + entidad + " PASO EL UMBRAL SET)" , grafica)
+
+    elif(float(GO) <= ultimo_valor):
+        print(entidad + " paso el umbral GO")
+        if( not BANDERA_CORREO_GO ):
+            print("Enviando correo")
+            BANDERA_CORREO_GO = not BANDERA_CORREO_GO
+            send_alert_attached("Aldo Mendoza (" + entidad + " PASO EL UMBRAL GO)" , grafica)
+    else:
+        print(entidad + " se encuentra por debajo de los umbrales")
+
+def MonitorearComportamiento(idAgente = -1, comunidad = '', ip = '', OPCION_MENU = False):
+    if( idAgente == -1):
+        os.system("clear")
+        numeroAgenteMonitorear = int( ObtenerNumeroAgente( "Selecciona el agente que deseas monitorear" ) )
+
+        if(numeroAgenteMonitorear == -1):
+            return
+        comunidad = ObtenerComunidadAgente(numeroAgenteMonitorear)
+        ip = agentes[ numeroAgenteMonitorear ]
+        idAgente = ObtenerIdAgente( int(numeroAgenteMonitorear) )
+    while(True):
+        print("Agente " + ip)
+        CPUs =  consultaSNMPWalk(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2')
+        for cpu in CPUs:
+            GraficarUmbrales(idAgente, ip, "CPU"+ cpu, UMBRAL_READY_CPU, UMBRAL_SET_CPU, UMBRAL_GO_CPU, "Carga CPU " + cpu)
+        GraficarUmbrales(idAgente, ip, "RAM", UMBRAL_READY_RAM, UMBRAL_SET_RAM, UMBRAL_GO_RAM, "Carga RAM ")
+        GraficarUmbrales(idAgente, ip, "Storage", UMBRAL_READY_STORAGE, UMBRAL_SET_STORAGE, UMBRAL_GO_STORAGE, "Almacenamiento ")
+        if(not OPCION_MENU):            
+            break
+        time.sleep(5)
+
+def GraficarUmbrales(idAgente, ip, entidad, UMBRAL_READY, UMBRAL_SET, UMBRAL_GO, labelCarga):
+    ultima_lectura = int(rrdtool.last("RRDsAgentes/monitoreo"+ idAgente + ".rrd"))
+    tiempo_final = ultima_lectura
+    tiempo_inicial = tiempo_final - 120
+
+    nombreGrafica = ip.replace(".","") + entidad
+    ret = rrdtool.graphv( "Monitoreo/" + nombreGrafica + ".png",
+                    "--start",str(tiempo_inicial),
+                    "--vertical-label=Carga del CPU: " + nombreGrafica ,
+                    '--lower-limit', '0',
+                    '--upper-limit', '100',
+                    "DEF:cargaEntidad=RRDsAgentes/monitoreo" + idAgente + ".rrd:" + entidad +":AVERAGE",
+                    "CDEF:carga=cargaEntidad,"+ UMBRAL_READY +",LT,cargaEntidad,0,IF",
+                    "CDEF:umbralReady=cargaEntidad,"+ UMBRAL_READY +",GT,cargaEntidad,0,IF",
+                    "CDEF:umbralSet=cargaEntidad,"+ UMBRAL_SET +",GT,cargaEntidad,0,IF",
+                    "CDEF:umbralGo=cargaEntidad,"+ UMBRAL_GO +",GT,cargaEntidad,0,IF",
+                    "VDEF:cargaMAX=cargaEntidad,MAXIMUM",
+                    "VDEF:cargaMIN=cargaEntidad,MINIMUM",
+                    "VDEF:cargaLAST=cargaEntidad,LAST",
+                    "AREA:carga#988D8D:" + labelCarga + " menor que " + UMBRAL_READY,
+                    "AREA:umbralReady#50DA23:" + labelCarga + " mayor que " + UMBRAL_READY,
+                    "AREA:umbralSet#FF8B00:" + labelCarga + " mayor que " + UMBRAL_SET,
+                    "AREA:umbralGo#FF0000:" + labelCarga + " que " + UMBRAL_GO,
+                    "HRULE:" + UMBRAL_READY + "#50DA23:Umbral ready 1 - " + UMBRAL_READY +"%",
+                    "HRULE:" + UMBRAL_SET + "#FF8B00:Umbral set " + UMBRAL_SET +" - " + UMBRAL_GO +"%",
+                    "HRULE:" + UMBRAL_GO + "#FF0000:Umbral go " + UMBRAL_GO +" - 100%",
+                    "PRINT:cargaLAST:%6.2lf %S",
+                    "GPRINT:cargaMAX:%6.2lf %SMAX",
+                    "GPRINT:cargaMIN:%6.2lf %SMIN",
+                    "GPRINT:cargaLAST:%6.2lf %SLAST")
+    VerificarUmbrales(UMBRAL_READY, UMBRAL_SET, UMBRAL_GO, ret['print[0]'], entidad, nombreGrafica)
+
 agentes = []
 ultimoID = InicializarVariables()
 
@@ -398,7 +520,7 @@ while(True):
     elif (opcion == "4"):
         GenerarReporte()
     elif (opcion == "5"):
-        MonitorearComportamiento()
+        MonitorearComportamiento(OPCION_MENU = True)
     elif (opcion == "6"):
         print( "Salir" )
         agentes.clear()
