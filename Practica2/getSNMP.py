@@ -48,8 +48,8 @@ def consultaSNMPWalk(comunidad, host, oid, entidad = "", ES_UN_DISCO = False):
                     return res
                 
                 if( ES_UN_DISCO ):
-                    descripcion = mibRes[len(mibRes) - 1 ].split(" = ")[1]
-                    disco = descripcion.split( entidad )
+                    descripcion = mibRes[len(mibRes) - 1 ].lower().split(" = ")[1]
+                    disco = descripcion.split( entidad.lower() )
                     if( len(disco) > 1):
                         return res
 

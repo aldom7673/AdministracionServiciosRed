@@ -6,8 +6,7 @@ import datetime
 from datetime import timedelta
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-from getSNMP import consultaSNMP
-from getSNMP import consultaSNMPWalk
+from getSNMP import consultaSNMP, consultaSNMPWalk
 from reportlab.lib.utils import ImageReader
 
 IP = 0
@@ -40,26 +39,38 @@ def InicializarVariables():
     return ultimoID
 
 def MonitorearRendimientoAgente(ip, comunidad, idAgente):
-    CPULoad = RAMLoad = StorageLoad = 0
+    RAMLoad = StorageLoad = 0.0
+    numeroRam = numeroAlamacenamiento = ''
+    CPUs, CPULoads = []
+    
     while(ip in agentes):
         estadoDelAgente = str(consultaSNMP( comunidad, ip, '1.3.6.1.2.1.1.1.0'))
-        if( estadoDelAgente.split( )[0] != "No" ):
-            consultaSistemaOperativo = str(consultaSNMP(comunidad, ip, '1.3.6.1.2.1.1.1.0'))
 
-            entidad = "Physical Memory"
-            res = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad)
-            TotalRAM = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.5.' + res)
-            UsoRAM = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.6.' + res)
+        if( estadoDelAgente.split( )[0] != "No" ):
+            if( numeroAlamacenamiento == '' ):
+                consultaSistemaOperativo = str(consultaSNMP(comunidad, ip, '1.3.6.1.2.1.1.1.0'))
+
+            entidad = "Physical Memory" #Memoria RAM
+            if( numeroRam == ''):
+                numeroRam = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad)
+            TotalRAM = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.5.' + numeroRam)
+            UsoRAM = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.6.' + numeroRam)
             RAMLoad = int(UsoRAM) * 100 / int( TotalRAM )
 
-            if (consultaSistemaOperativo == 'Linux'):
-                entidad = "/"
-            else:
-                entidad = "C:"
-            res = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad)
-            TotalStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.5.' + res)
-            UseStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.6.' + res)
-            StorageLoad = int(UseStorage) * 100 / int(TotalStorage)            
+            if( numeroAlamacenamiento == ''):
+                if (consultaSistemaOperativo == 'Linux'):
+                    entidad = "/" #Almacenamiento
+                else:
+                    entidad = "C:" #Almacenamiento
+                numeroAlamacenamiento = consultaSNMPWalk(comunidad, ip,'1.3.6.1.2.1.25.2.3.1.3', entidad)
+            TotalStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.5.' + numeroAlamacenamiento)
+            UsoStorage = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.2.3.1.6.' + numeroAlamacenamiento)
+            StorageLoad = int(UsoStorage) * 100 / int(TotalStorage)
+            
+            if( len(CPUs) == 0 ):
+                CPUs =  consultaSNMPWalk(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2')
+            for cpu in CPUs:
+                CPULoads.append( consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2.' + cpu) )
 
 def MonitorearAgente(ip, comunidad, idAgente):
     crearRRDs(idAgente)
@@ -96,7 +107,7 @@ def MonitorearAgente(ip, comunidad, idAgente):
 
 
 def crearRRDs( idAgente ):
-	ret = rrdtool.create("RRDsAgentes/agente"+ idAgente +".rrd",
+    ret = rrdtool.create("RRDsAgentes/agente"+ idAgente +".rrd",
 	                     "--start",'N',
 	                     "--step",'1',
 	                     "DS:ifInUcastPkts:COUNTER:600:U:U",
@@ -104,21 +115,26 @@ def crearRRDs( idAgente ):
 	                     "DS:icmpOutEchos:COUNTER:600:U:U",
 	                     "DS:tcpInSegs:COUNTER:600:U:U",
 	                     "DS:udpInDatagrams:COUNTER:600:U:U",
-                         "DS:CPULoad:GAUGE:600:U:U",
-                         "DS:RAMLoad:GAUGE:600:U:U",
-                         "DS:StorageLoad:GAUGE:600:U:U",
 	                     "RRA:AVERAGE:0.5:1:700",
 	                     "RRA:AVERAGE:0.5:1:700",
 	                     "RRA:AVERAGE:0.5:1:700",
 	                     "RRA:AVERAGE:0.5:1:700",
-	                     "RRA:AVERAGE:0.5:1:700",
-                         "RRA:AVERAGE:0.5:1:700",
-                         "RRA:AVERAGE:0.5:1:700",
-                         "RRA:AVERAGE:0.5:1:700")
-	rrdtool.dump( 'RRDsAgentes/agente'+ idAgente +'.rrd', 'RRDsAgentes/agente'+ idAgente +'.xml' )
+	                     "RRA:AVERAGE:0.5:1:700")
+    rrdtool.dump( 'RRDsAgentes/agente'+ idAgente +'.rrd', 'RRDsAgentes/agente'+ idAgente +'.xml' )
 
-	if ret:
-	    print ( rrdtool.error() )
+    if ret:
+        print ( rrdtool.error() )
+
+# def crearRRDsMonitoreo(idAgente,DS,RRA):
+# 	ret = rrdtool.create("RRDsAgentes/monitoreo"+ idAgente +".rrd",
+# 	                     "--start",'N',
+# 	                     "--step",'1',
+#                          DS,
+#                          RRA)
+# 	rrdtool.dump( 'RRDsAgentes/monitoreo'+ idAgente +'.rrd', 'RRDsAgentes/monitoreo'+ idAgente +'.xml' )
+
+# 	if ret:
+# 	    print ( rrdtool.error() )
 
 def ResumenGeneral():
     os.system("clear")
@@ -358,18 +374,19 @@ def ObtenerNumeroAgente( mensaje ):
     input( "Por favor, ingrese una opcion valida. Pulse enter para continuar ... " )
     return ObtenerNumeroAgente(mensaje )
 
-def DeteccionDeComportamientos():
+def MonitorearComportamiento():
     print( "" )
 agentes = []
 ultimoID = InicializarVariables()
 
 while(True):
-    os.system( "clear" )
+    #os.system( "clear" )
     print( "1. Resumen general" )
     print( "2. Agregar agente" )
     print( "3. Eliminar agente" )
     print( "4. Generar reporte" )
-    print( "5. Salir" )
+    print( "5. Monitorear agente" )
+    print( "6. Salir" )
     opcion = input( "Ingresa una opcion: " )
 
     if   (opcion == "1"):
@@ -381,7 +398,7 @@ while(True):
     elif (opcion == "4"):
         GenerarReporte()
     elif (opcion == "5"):
-        DeteccionDeComportamientos()
+        MonitorearComportamiento()
     elif (opcion == "6"):
         print( "Salir" )
         agentes.clear()
