@@ -498,17 +498,67 @@ def GraficarUmbrales(idAgente, ip, entidad, UMBRAL_READY, UMBRAL_SET, UMBRAL_GO,
                     "GPRINT:cargaLAST:%6.2lf %SLAST")
     VerificarUmbrales(UMBRAL_READY, UMBRAL_SET, UMBRAL_GO, ret['print[0]'], entidad, nombreGrafica)
 
+def ModificarUmbrales():
+    while(True):
+        os.system( "clear" )
+        print( "Selecciona el umbral que quieres modificar" )
+        print( "1. CPUs" )
+        print( "2. RAM" )
+        print( "3. Almacenamiento" )
+        opcion = input( "Ingresa una opcion: " )
+
+        if( opcion == "4"):
+            return
+
+        if( opcion.isdigit() ):
+            umbral = int( opcion )
+            if( 0 < umbral < 4):
+                umbralModificar = ''
+                if( umbral == 1): 
+                    global UMBRAL_READY_CPU, UMBRAL_SET_CPU, UMBRAL_GO_CPU
+                    umbralModificar = "CPUs"
+                    print(UMBRAL_READY_CPU + " " + UMBRAL_SET_CPU + " " + UMBRAL_GO_CPU)
+                elif( umbral == 2): 
+                    umbralModificar = "RAM"
+                    global UMBRAL_READY_RAM, UMBRAL_SET_RAM, UMBRAL_GO_RAM
+                    print(UMBRAL_READY_RAM + " " + UMBRAL_SET_RAM + " " + UMBRAL_GO_RAM)
+                else:
+                    umbralModificar = "almacenamiento"
+                    global UMBRAL_READY_STORAGE, UMBRAL_SET_STORAGE, UMBRAL_GO_STORAGE
+                    print(UMBRAL_READY_STORAGE + " " + " " + UMBRAL_SET_STORAGE + " " + UMBRAL_GO_STORAGE)
+                while(True):
+                    nuevosUmbrales = input( "Ingresa los nuevos umbrales para " + umbralModificar +"  de la siguiente manera: UMBRAL_READY UMBRAL_SET UMBRAL_GO: " )
+                    umbrales = nuevosUmbrales.split(" ")
+                    if( len(umbrales) == 3):
+                        if( umbral == 1): 
+                            UMBRAL_READY_CPU = umbrales[0]
+                            UMBRAL_SET_CPU = umbrales[1]
+                            UMBRAL_GO_CPU = umbrales[2]
+                        elif( umbral == 2): 
+                            UMBRAL_READY_RAM = umbrales[0]
+                            UMBRAL_SET_RAM = umbrales[1]
+                            UMBRAL_GO_RAM = umbrales[2]
+                        else:
+                            UMBRAL_READY_STORAGE = umbrales[0]
+                            UMBRAL_SET_STORAGE = umbrales[1]
+                            UMBRAL_GO_STORAGE = umbrales[2]
+                        break
+                    input("Verifique los umbrales. Pulse enter para continuar ... ")
+                break
+            input("Verifique el umbral seleccionado. Pulse enter para continuar ... ")            
+
 agentes = []
 ultimoID = InicializarVariables()
 
 while(True):
-    #os.system( "clear" )
+    os.system( "clear" )
     print( "1. Resumen general" )
     print( "2. Agregar agente" )
     print( "3. Eliminar agente" )
     print( "4. Generar reporte" )
     print( "5. Monitorear agente" )
-    print( "6. Salir" )
+    print( "6. Modificar umbrales" )
+    print( "7. Salir" )
     opcion = input( "Ingresa una opcion: " )
 
     if   (opcion == "1"):
@@ -522,6 +572,8 @@ while(True):
     elif (opcion == "5"):
         MonitorearComportamiento(OPCION_MENU = True)
     elif (opcion == "6"):
+        ModificarUmbrales()        
+    elif (opcion == "7"):
         print( "Salir" )
         agentes.clear()
         break
