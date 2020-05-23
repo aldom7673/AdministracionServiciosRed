@@ -1,0 +1,97 @@
+#!/usr/bin/perl
+
+# This is a snmptrapd handler script to convert snmp traps into email
+# messages.
+
+# Usage:
+# Put a line like the following in your snmptrapd.conf file:
+#  traphandle TRAPOID|default /usr/local/bin/traptoemail [-f FROM] [-s SMTPSERVER]b ADDRESSES
+#     FROM defaults to "root"
+#     SMTPSERVER defaults to "localhost"
+
+use Net::SMTP::SSL;
+use Getopt::Std;
+use POSIX qw(strftime);
+
+# for sane timestamp format
+$ENV{LANG} = 'C';
+
+$opts{'s'} = "localhost";
+$opts{'f'} = 'root@' . `hostname -f`;
+chomp($opts{'f'});
+getopts("hs:f:", \%opts);
+
+if ($opts{'h'}) {
+    print "
+traptoemail [-s smtpserver] [-f fromaddress] toaddress [...]
+
+  traptoemail shouldn't be called interatively by a user.  It is
+  designed to be called as an snmptrapd extension via a \"traphandle\"
+  directive in the snmptrapd.conf file.  See the snmptrapd.conf file for
+  details.
+
+  Options:
+    -s smtpserver      Sets the smtpserver for where to send the mail through.
+    -f fromaddress     Sets the email address to be used on the From: line.
+    toaddress          Where you want the email sent to.
+
+";
+    exit;
+}
+
+die "no recepients to send mail to" if ($#ARGV < 0);
+
+# process the trap:
+$hostname = <STDIN>;
+chomp($hostname);
+$ipaddress = <STDIN>;
+chomp($ipaddress);
+
+$maxlen = 0;
+while(<STDIN>) {
+    ($oid, $value) = /([^\s]+)\s+(.*)/;
+    push @oids, $oid;
+    push @values, $value;
+    $maxlen = (length($oid) > $maxlen) ? length($oid) : $maxlen;
+}
+$maxlen = 60 if ($maxlen > 60);
+$formatstr = "%" . $maxlen . "s  %s\n";
+
+die "illegal trap" if ($#oids < 1);
+
+# send the message
+$message = Net::SMTP::SSL->new($opts{'s'},
+	Port => 465,
+	Debug => 1) || die "can't talk to server $opts{'s'}\n";
+$message -> auth('aldom7673','Crazy_train4815162342');
+$message->mail($opts{'f'});
+$message->to(@ARGV) || die "failed to send to the recepients ",join(",",@ARGV),": $!";
+$message->data();
+$message->datasend("To: " . join(", ",@ARGV) . "\n");
+$message->datasend("From: $opts{f}\n");
+$message->datasend("Date: ".strftime("%a, %e %b %Y %X %z", localtime())."\n");
+$message->datasend("Subject: Modificacion en trap $values[1]\n");
+$message->datasend("\n");
+#$message->datasend("Host: $hostname ($ipaddress)\n");
+for($i = 0; $i <= $#oids; $i++) {
+ #   $message->datasend(sprintf($formatstr, $oids[$i], $values[$i]));
+ #  $message->datasend(sprintf("this $values[$i]\n"));
+# $message->datasend(sprintf("$values[$i] \n"));
+}
+$message->datasend(sprintf("Aldo Daniel Mendoza Morales\n"));
+#if($values[2] == 3){
+#$message->datasend(sprintf(3));
+#}else{
+#$message->datasend(sprintf(4));
+#}
+#$message->datasend(sprintf($values[2]));
+
+$message->datasend(sprintf("El sistema de administracion de fallas ha detectado el siguiente percance en la interface $values[3]\n"));
+if($values[5] == 1){
+	$message->datasend(sprintf("Link up\n"));
+}else{
+	$message->datasend(sprintf("Link down\n"));
+}
+$message->datasend(sprintf("Favor de verificar el suceso y ejecute las acciones correspondientes"));
+$message->dataend();
+$message->quit;
