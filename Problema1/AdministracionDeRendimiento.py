@@ -31,6 +31,7 @@ BANDERA_CORREO_READY = False
 BANDERA_CORREO_SET = False
 BANDERA_CORREO_GO = False
 
+banderaCorreos = False
 def InicializarVariables():
     #print( "Cargando datos de los agentes" )
     try:
@@ -119,59 +120,122 @@ def MonitorearRendimientoAgente(ip, comunidad, idAgente):
             time.sleep(1)
 #"RRDsAgentes/prediccion" + idAgente + ".rrd"
 def DetectarComportamiento(ip, comunidad, idAgente):
+    global banderaCorreos 
+    banderaMC = True
+    banderaPre = True
+    thread_read = threading.Thread(target = EnviarCorreo, args=[ip, idAgente])
+    thread_read.start()
     while(ip in agentes):
-        print("Detectando comportamiento para " + idAgente)
         CPULoad = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.25.3.3.1.2.196608' )
         #CPULoad = consultaSNMP(comunidad, ip, '1.3.6.1.2.1.2.2.1.10.1' )
         valor = "N:" + CPULoad            
         rrdtool.update("RRDsAgentes/prediccion" + idAgente + '.rrd', valor)
         rrdtool.dump('RRDsAgentes/prediccion' + idAgente + '.rrd','RRDsAgentes/prediccion' + idAgente + '.xml')
-        print(valor)
         time.sleep(0.5)
+        umbral = 90
+        ultimo=rrdtool.last( "RRDsAgentes/prediccion" + idAgente + ".rrd" )        
+        tiempo_inicial = ultimo-200
+        ret2 = rrdtool.graphv( "Graficas/minimoscuadrados" + idAgente + ".png",
+                     "--start",str(tiempo_inicial),
+                    "--end",str(ultimo + 60 *2 ),
+                    "--title","Carga de CPU",
+                     "--vertical-label=Carga de CPU",
+                    '--lower-limit', '0',
+                    '--upper-limit', '100',
+                     "DEF:carga=" + "RRDsAgentes/prediccion" + idAgente + '.rrd' + ":carga:AVERAGE",
+                     "CDEF:umbral25=carga,"+str(umbral)+",LT,0,carga,IF",
+                     "VDEF:cargaMAX=carga,MAXIMUM",
+                     "VDEF:cargaMIN=carga,MINIMUM",
+                     "VDEF:cargaSTDEV=carga,STDEV",
+                     "VDEF:cargaLAST=carga,LAST",
+					 
+                     "VDEF:m=carga,LSLSLOPE",
+					 "VDEF:b=carga,LSLINT",
+					 'CDEF:y=carga,POP,m,COUNT,*,b,+',
+                     "VDEF:yUltimo=y,LAST",
 
-        ultimo=rrdtool.last( "RRDsAgentes/prediccion" + idAgente + ".rrd" )
-        inicio=ultimo-200
-        ayerInicio=(inicio-200)
-        ayerFinal=ultimo-200
-        primero=rrdtool.first( "RRDsAgentes/prediccion" + idAgente + ".rrd" )
-        ret = rrdtool.graphv("Graficas/prediccionX" + idAgente + ".png",
-						'--start', str(inicio), '--end', str(ultimo+5), '--title=' + "title",
-						"--vertical-label=Bytes/s",
+                     "AREA:umbral25#FF9F00:Prediccion en 2 min ",
+                     "GPRINT:yUltimo:%6.2lf %S.",
+                     "HRULE:"+str(umbral)+"#FF0000:Umbral al "+str(umbral)+"%\\n",
+                     "AREA:carga#00FF00:Carga del CPU",
+                     "GPRINT:cargaMIN:%6.2lf %SMIN",
+                     "GPRINT:cargaSTDEV:%6.2lf %SSTDEV",
+                     "GPRINT:cargaLAST:%6.2lf %SLAST",
+
+					 "LINE2:y#FFBB00",
+                     "PRINT:yUltimo:%6.2lf %S "
+			)
+        #print(str(ret2['print[0]']))
+        
+        try:
+            prediccion = float( ret2['print[0]'] )
+        except:
+            prediccion = 0.0
+
+        if( prediccion >= 90.0 and banderaCorreos and banderaMC):
+            print("Enviando correo prediccion")
+            banderaMC = False
+            send_alert_attached("El agente cerca de alcanzar el umbral establecido", "Graficas/minimoscuadrados" + idAgente ,"El porcentaje de uso de cpu del agente " + ip + " se encuentra cerca del 90%. Por favor, tomar las medidas correspondientes.")
+
+        ret = rrdtool.graphv("Graficas/prediccion" + idAgente + ".png",
+						'--start', str(ultimo - 60 * 5),
+                         '--end', str(ultimo +  120),
+                         '--title=' + "Comportamiento anómalo",
+						"--vertical-label=Carga de cpu",
 						'--slope-mode',
-						"DEF:obs="       + "RRDsAgentes/prediccion" + idAgente + ".rrd" + ":inoctets:AVERAGE",
-						#"DEF:outoctets=" + str(agentPath + fname) + ":outoctets:AVERAGE",
-						"DEF:pred="      + "RRDsAgentes/prediccion" + idAgente + ".rrd"+ ":inoctets:HWPREDICT",
-						"DEF:dev="       + "RRDsAgentes/prediccion" + idAgente + ".rrd"+ ":inoctets:DEVPREDICT",
-						"DEF:fail="      + "RRDsAgentes/prediccion" + idAgente + ".rrd" + ":inoctets:FAILURES",
-						"DEF:yvalue="+ "RRDsAgentes/prediccion" + idAgente + ".rrd" +":inoctets:AVERAGE:start=" + str(ayerInicio) + ":end=" + str(ayerFinal),
-              			'SHIFT:yvalue:300',
-					 #"RRA:DEVSEASONAL:1d:0.1:2",
-					 #"RRA:DEVPREDICT:5d:5",
-					 #"RRA:FAILURES:1d:7:9:5""
-					 	"CDEF:scaledh=yvalue",
-						"CDEF:scaledobs=obs",
-						"CDEF:upper=pred,dev,2,*,+",
-						"CDEF:lower=pred,dev,2,*,-",
-						"CDEF:scaledupper=upper",
-						"CDEF:scaledlower=lower",
-						"CDEF:scaledpred=pred,",
+						"DEF:valor="       + "RRDsAgentes/prediccion" + idAgente + ".rrd" + ":carga:AVERAGE",
+						"DEF:prediccion="      + "RRDsAgentes/prediccion" + idAgente + ".rrd"+ ":carga:HWPREDICT",
+						"DEF:desv="       + "RRDsAgentes/prediccion" + idAgente + ".rrd"+ ":carga:DEVPREDICT",
+						"DEF:falla="      + "RRDsAgentes/prediccion" + idAgente + ".rrd" + ":carga:FAILURES",						
+						"CDEF:carga=valor",
+						"CDEF:limiteSuperior=prediccion,desv,2,*,+",
+						"CDEF:limiteInferior=prediccion,desv,2,*,-",
+						"CDEF:superior=limiteSuperior",
+						"CDEF:inferior=limiteInferior",
+						"CDEF:pred=prediccion,",
+                        
 
-						"AREA:scaledh#C9C9C9:Yesterday",
-						"TICK:fail#FDD017:1.0:FFallas",
-						"LINE3:scaledobs#00FF00:In traffic",
-						"LINE1:scaledpred#FF00FF:Prediccion\\n",
-						#"LINE1:outoctets#0000FF:Out traffic",
-						"LINE1:scaledupper#ff0000:Upper Bound Average bits in\\n",
-						"LINE1:scaledlower#0000FF:Lower Bound Average bits in",
+						"TICK:falla#FDD017:1.0:_Fallas\\n",
+						
+                        "LINE3:carga#00FF00:Carga cpu",
+                        "VDEF:cargaMAX=carga,MAXIMUM",
+                        "VDEF:cargaMIN=carga,MINIMUM",
+                        "VDEF:cargaLAST=carga,LAST",
+                        "GPRINT:cargaMIN:%6.2lf %SCarga",
+                        "GPRINT:cargaMIN:%6.2lf %SMin",                     
+                        "GPRINT:cargaMAX:%6.2lf %sMax",
 
-						"VDEF:lastfail=fail,LAST",
-						#"VDEF:max=fail,MAXIMUM",
-                     	#"VDEF:min=fail,MINIMUM",
+						"LINE1:pred#FF00FF:Predicción",
+                        "VDEF:predLast=pred,LAST",
+                        "GPRINT:predLast:%6.2lf %spred",
+
+						"LINE1:superior#ff0000:Limite superior",
+						"LINE1:inferior#0000FF:Limite inferior",                            
+						"VDEF:lastfail=falla,LAST",
+                        
 						"PRINT:lastfail: %c :strftime",
 					 	"PRINT:lastfail:%6.2lf %S ",
-					 	'PRINT:fail:MIN:%1.0lf',
-				   		'PRINT:fail:MAX:%1.0lf',)
-        print("Fin comportamiento para " + idAgente)
+					 	'PRINT:falla:MIN:%1.0lf',
+				   		'PRINT:falla:MAX:%1.0lf',)
+
+        ultima_falla= ret['print[1]']
+        try:
+            val = float( ultima_falla )
+        except:
+            val = 0.0
+                        
+        if(banderaCorreos and banderaPre):
+            if(val > 0):
+                banderaPre = False
+                print("Enviando correo fallas")
+                send_alert_attached("Un agente ha presentado una falla", "Graficas/prediccion" + idAgente ,"El porcentaje de uso de cpu del agente " + ip + " ha presentado una falla . Por favor, tomar las medidas correspondientes.")
+        #print(ultima_falla)                           
+
+def EnviarCorreo(ip, idAgente):
+    time.sleep(60)
+    global banderaCorreos 
+    banderaCorreos = True
+    print("Listo!")
 
 def MonitorearAgente(ip, comunidad, idAgente):
     crearRRDs(idAgente)
@@ -251,13 +315,13 @@ def crearRRDsHw( idAgente ):
     #         "RRA:DEVPREDICT:" + rows + ":3",
     #         "RRA:FAILURES:" + rows + ":3:5:3")
 
-    rows = "100"
-    seasonalPeriod = "15"
+    rows = "800"
+    seasonalPeriod = "5"
     rra_num = "5"
     
     ret = rrdtool.create("RRDsAgentes/prediccion"+ idAgente +".rrd",
             '--start','N','--step','1',
-            "DS:inoctets:GAUGE:600:U:U",
+            "DS:carga:GAUGE:600:U:U",
             "RRA:AVERAGE:0.5:1:60",
             "RRA:HWPREDICT:" + rows + ":0.9:0.0035:" + seasonalPeriod + ":3",
             "RRA:SEASONAL:" + seasonalPeriod + ":0.1:2",

@@ -5,14 +5,14 @@ from email.mime.multipart import MIMEMultipart
 
 COMMASPACE = ', '
 # Define params
-pngpath = 'Monitoreo/'
+pngpath = ''
 
-mailsender = ""
-mailreceip = ""
+mailsender = "pruebas.redes.tres@gmail.com"
+mailreceip = "aldom7673@gmail.com"
 mailserver = 'smtp.gmail.com: 587'
-password = ''
+password = 'pruebasRedes_3'
 
-def send_alert_attached(subject, imagen):
+def send_alert_attached(subject, imagen, cuerpo = "El umbral ha sido superado, por favor, implemente las acciones correspondientes para atender el problema."):
     """ Will send e-mail, attaching png
     files in the flist.
     """
@@ -23,7 +23,7 @@ def send_alert_attached(subject, imagen):
     fp = open(pngpath + imagen + '.png', 'rb')
     img = MIMEImage(fp.read())
     fp.close()
-    texto = MIMEText("El umbral ha sido superado, por favor, implemente las acciones correspondientes para atender el problema.")
+    texto = MIMEText(cuerpo)
     msg.attach(img)
     msg.attach(texto)
     mserver = smtplib.SMTP(mailserver)
